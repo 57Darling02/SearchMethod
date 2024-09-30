@@ -1,8 +1,8 @@
-import random, math, sys
-import matplotlib.pyplot as plt # 画图
+import random, math
 from copy import deepcopy
-
-from numpy.core.defchararray import center
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('TkAgg')  # 或其他适合的后端
 from tqdm import *  # 进度条
 DEBUG = True
 
@@ -30,7 +30,7 @@ check_spot = {i: (X[i], Y[i]) for i in range(len(X))}
 # (a,b,c,d)
 train1 = (0,9,0,600)
 train2 = (1,5,0,600)
-train3 = (0,8,600,1200)
+train3 = (0,8,700,1300)
 alltrains = [train1, train2, train3]
 check_request_index = 1
 # check_task_dist[0] is the no limited check_task, it need to use when generate gene
@@ -44,7 +44,7 @@ for train in alltrains:
 #print_DEBUG(f'checktask:{check_task_dist}') # check_task_dist[num from 0] = [(c,d),check_spot_number]
 
 geneNum = 100
-generationNum = 3000  # 迭代次数
+generationNum = 30  # 迭代次数
 CENTER = 0  # 配送中心
 HUGE = 99999
 VARY = 0.05  # 变异几率
@@ -56,7 +56,7 @@ speed = 40  # 速度，km/h
 costPerKilo = 1  # 油价
 Q = 0
 m = 0  # 换电站数量
-t = 0.5
+t = 0.1
 dis = 0
 
 class Gene:
@@ -175,9 +175,14 @@ class Gene:
         self.chooseProb = self.fit / sumFit
 
     def moveRandSubPathLeft(self):
-        #print(f"beforemovegene{self.data}")
+        temp_counter = 0
+        index = 0
         path = random.randrange(k)  # choose a path index
-        index = self.data.index(CENTER, path+1) # move to the chosen index
+        if path == 0:
+            return
+        while temp_counter != path:
+            index = self.data.index(CENTER, index+1) # move to the chosen index
+            temp_counter += 1
         # move first CENTER
         locToInsert = 0
         self.data.insert(locToInsert, self.data.pop(index))
@@ -188,39 +193,15 @@ class Gene:
             self.data.insert(locToInsert, self.data.pop(index))
             index += 1
             locToInsert += 1
-        #print(f"aftermovegene{self.data}")
         assert(self.length+k == len(self.data))
 
     # plot this gene in a new window
     def plot(self):
+
         Xorder = [check_spot[check_task_dist[i][1]][0] for i in self.data]
         Yorder = [check_spot[check_task_dist[i][1]][1] for i in self.data]
+        animate_plot(Xorder, Yorder, pause_time=1)
 
-        colors = ['black', 'red', 'blue', 'cyan', 'purple']  # 定义几种颜色
-        color_index = 0
-        start_index = 0
-
-        for i in range(len(Xorder)):
-            if Xorder[i] == -1 and Yorder[i] == -1:
-                plt.plot(Xorder[start_index:i+1], Yorder[start_index:i+1], c=colors[color_index % len(colors)], zorder=1)
-                start_index = i
-                color_index += 1
-
-        # 绘制最后一段
-        plt.plot(Xorder[start_index:], Yorder[start_index:], c=colors[color_index % len(colors)], zorder=1)
-
-        plt.scatter(X, Y, zorder=2)
-        plt.scatter([X[0]], [Y[0]], marker='o', zorder=3)
-        plt.scatter(X[-m:], Y[-m:], marker='^', zorder=3)
-        plt.title(self.name)
-        plt.show()
-
-
-def getSumFit(genes):
-    sum = 0
-    for gene in genes:
-        sum += gene.fit
-    return sum
 
 
 # return a bunch of random genes
@@ -266,11 +247,8 @@ def choose(genes):
 
 # 交叉一对
 def crossPair(gene1, gene2, crossedGenes):
-    #print(f"gene1{gene1.data}")
     gene1.moveRandSubPathLeft()
     gene2.moveRandSubPathLeft()
-    #print(f"gene1{gene1.data}")
-    # print(f"gene2{gene2.data}")
     newGene1 = []
     newGene2 = []
     # copy first paths
@@ -306,74 +284,52 @@ def crossPair(gene1, gene2, crossedGenes):
     # 计算适应度最高的
     key = lambda gene: gene.fit
     possible = []
-    # print(f"gene1{gene1.data}")
-    #print(f"newgene1{newGene1}")
-    #print(f"firstpos1:{firstPos1}")
-    '''
-    while gene1.data[firstPos1] != CENTER:
-        newGene = newGene1.copy()
-        newGene.insert(firstPos1, CENTER)
-        newGene = Gene(data=newGene.copy())
-        possible.append(newGene)
-        firstPos1 += 1
-    '''
+
     # Calculate the number of gaps between the second and last zero in newGene1
     second_zero_index = newGene1.index(CENTER, 1)
-    last_zero_index = len(newGene1) - 1
+    last_zero_index = len(newGene1) - 2
 
     # Find all possible positions to insert a zero
     possible_positions = [i for i in range(second_zero_index + 2, last_zero_index)]
+    if len(possible_positions) < k - 2:
+        return
 
     # Randomly shuffle the positions and insert zeros ensuring no two zeros are adjacent
     #for _ in range(math.comb(len(possible_positions), k - 2)):
+
     for _ in range(10):
         tempGene = newGene1.copy()
-        #print(f'newGene1{newGene1}')
-        random.shuffle(possible_positions)
-        inserted_zeros = 0
-        for pos in possible_positions:
-            if inserted_zeros >= k - 2:
-                break
-            if tempGene[pos - 1] != CENTER and tempGene[pos] != CENTER:
-                tempGene.insert(pos, CENTER)
-                inserted_zeros += 1
-        #print(f"tempGene1{tempGene}")
+        temp_position = random.sample(possible_positions, len(possible_positions))
+        temp_positions = temp_position[:k-2]
+        temp_positions.sort()
+        for i in range(len(temp_positions)):
+            tempGene.insert(temp_positions[i]+i, CENTER)
         possible.append(Gene(data=tempGene.copy()))
     possible.sort(reverse=True, key=key)
     assert(possible)
     crossedGenes.append(possible[0])
     key = lambda gene: gene.fit
     possible = []
-    '''
-    while gene2.data[firstPos2] != CENTER:
-        newGene = newGene2.copy()
-        newGene.insert(firstPos2, CENTER)
-        newGene = Gene(data=newGene.copy())
-        possible.append(newGene)
-        firstPos2 += 1
-    '''
-    # Calculate the number of gaps between the second and last zero in newGene1
+    # Calculate the number of gaps between the second and last zero in newGene2
     second_zero_index = newGene2.index(CENTER, 1)
-    last_zero_index = len(newGene2) - 1
-
+    last_zero_index = len(newGene2) - 2
     # Find all possible positions to insert a zero
     possible_positions = [i for i in range(second_zero_index + 2, last_zero_index)]
 
+    if len(possible_positions) < k - 2:
+        return
     # Randomly shuffle the positions and insert zeros ensuring no two zeros are adjacent
     #for _ in range(math.comb(len(possible_positions), k - 2)):
     for _ in range(10):
         tempGene = newGene2.copy()
-        print(f"newGene2{newGene2}")
-        random.shuffle(possible_positions)
-        inserted_zeros = 0
-        print(f"possible_positions{possible_positions}")
-        for pos in possible_positions:
-            if inserted_zeros >= k - 2:
-                break
-            if tempGene[pos - 1] != CENTER and tempGene[pos] != CENTER:
-                tempGene.insert(pos, CENTER)
-                inserted_zeros += 1
-        print(f"tempGene2{tempGene}")
+        temp_position = random.sample(possible_positions, len(possible_positions))
+        temp_positions = temp_position[:k - 2]
+        temp_positions.sort()
+        # print(f"temp_position:{temp_positions}")
+        # print(f"tempGene:{tempGene}")
+        for i in range(len(temp_positions)):
+            tempGene.insert(temp_positions[i] + i, CENTER)
+            # print(f'tempGeneinsert:{tempGene}')
         possible.append(Gene(data=tempGene.copy()))
     possible.sort(reverse=True, key=key)
     crossedGenes.append(possible[0])
@@ -423,6 +379,45 @@ def vary(genes):
         if random.random() < VARY:
             genes[index] = varyOne(gene)
     return genes
+
+def animate_plot(Xorder, Yorder, pause_time=1):
+    # 启用交互模式
+    plt.ion()
+
+    # 创建一个新的绘图
+    fig, ax = plt.subplots()
+
+    # 画出所有点，初始为红色
+    scat = ax.scatter(Xorder, Yorder, color='red')
+
+    # 设置图形的范围（可选，根据数据调整）
+    ax.set_xlim(min(Xorder) - 1, max(Xorder) + 1)
+    ax.set_ylim(min(Yorder) - 1, max(Yorder) + 1)
+
+    # 显示图形并刷新
+    plt.show()
+    plt.pause(0.1)  # 短暂暂停以确保图形窗口显示
+
+    # 遍历点并逐步连接
+    for i in range(1, len(Xorder)):
+        # 将上一个点变为绿色
+        ax.scatter(Xorder[i - 1], Yorder[i - 1], color='green')
+
+        # 连接当前点和上一个点
+        ax.plot([Xorder[i - 1], Xorder[i]], [Yorder[i - 1], Yorder[i]], color='blue')
+
+        # 刷新图形以显示更改
+        plt.draw()
+        plt.pause(1)  # 暂停1秒
+
+    # 将最后一个点变为绿色
+    ax.scatter(Xorder[-1], Yorder[-1], color='green')
+
+    # 最终刷新并保持图形窗口打开
+    plt.draw()
+    plt.pause(0.1)  # 短暂暂停以确保最后一个点变色
+    plt.ioff()  # 关闭交互模式
+    plt.show()
 
 if __name__ == "__main__" :
     genes = getRandomGenes(geneNum) # 初始种群
