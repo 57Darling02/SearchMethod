@@ -1,7 +1,9 @@
 import random, math
 from copy import deepcopy
+import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.patches as patches
 matplotlib.use('TkAgg')  # 或其他适合的后端
 from tqdm import *  # 进度条
 DEBUG = True
@@ -20,7 +22,7 @@ Y = [i*railway_gap  for i in range(0, railway_num+1) for _ in range (0, max_trai
 Xcenter= [i*train_box_length/2 for _ in range (0, railway_num) for i in range(-1, 2*(max_train_box_num-1),2)]
 Ycenter = [railway_gap/2*(1+2*i)  for i in range(0, railway_num) for _ in range (-1, 2*(max_train_box_num-1),2)]
 # insert Center_pos as the first element of check_spot
-Center_pos = (-1,-1)
+Center_pos = (-20,-1)
 X.insert(0,Center_pos[0])
 Y.insert(0,Center_pos[1])
 
@@ -200,7 +202,7 @@ class Gene:
 
         Xorder = [check_spot[check_task_dist[i][1]][0] for i in self.data]
         Yorder = [check_spot[check_task_dist[i][1]][1] for i in self.data]
-        animate_plot(Xorder, Yorder, pause_time=1)
+        animate_plot_funcanimation(Xorder, Yorder)
 
 
 
@@ -380,51 +382,20 @@ def vary(genes):
             genes[index] = varyOne(gene)
     return genes
 
-# def animate_plot(Xorder, Yorder, pause_time=1):
-#     # 启用交互模式
-#     plt.ion()
 
-#     # 创建一个新的绘图
-#     fig, ax = plt.subplots()
+def animate_plot_funcanimation(Xorder, Yorder, base_steps_per_unit=10, interval=10):
+    """
+    使用 FuncAnimation 实现机器人移动的动画仿真。
 
-#     # 画出所有点，初始为红色
-#     scat = ax.scatter(Xorder, Yorder, color='red')
-
-#     # 设置图形的范围（可选，根据数据调整）
-#     ax.set_xlim(min(Xorder) - 1, max(Xorder) + 1)
-#     ax.set_ylim(min(Yorder) - 1, max(Yorder) + 1)
-
-#     # 显示图形并刷新
-#     plt.show()
-#     plt.pause(0.1)  # 短暂暂停以确保图形窗口显示
-
-#     # 遍历点并逐步连接
-#     for i in range(1, len(Xorder)):
-#         # 将上一个点变为绿色
-#         ax.scatter(Xorder[i - 1], Yorder[i - 1], color='green')
-
-#         # 连接当前点和上一个点
-#         ax.plot([Xorder[i - 1], Xorder[i]], [Yorder[i - 1], Yorder[i]], color='blue')
-
-#         # 刷新图形以显示更改
-#         plt.draw()
-#         plt.pause(1)  # 暂停1秒
-
-#     # 将最后一个点变为绿色
-#     ax.scatter(Xorder[-1], Yorder[-1], color='green')
-
-#     # 最终刷新并保持图形窗口打开
-#     plt.draw()
-#     plt.pause(0.1)  # 短暂暂停以确保最后一个点变色
-#     plt.ioff()  # 关闭交互模式
-#     plt.show()
-
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-
-def animate_plot(Xorder, Yorder, pause_time=1):
-    # 启用交互模式
-    plt.ion()
+    参数：
+    - Xorder: 点的X坐标列表
+    - Yorder: 点的Y坐标列表
+    - base_steps_per_unit: 每单位距离的基础步数，用于控制移动速度
+    - interval: 每帧之间的时间间隔（毫秒）
+    """
+    # 计算每段的距离和对应的步数
+    distances = [math.hypot(Xorder[i] - Xorder[i-1], Yorder[i] - Yorder[i-1]) for i in range(1, len(Xorder))]
+    steps_per_move = [max(int(distance/(speed*3.6) *1000/interval ), 1) for distance in distances]
 
     # 创建一个新的绘图
     fig, ax = plt.subplots()
@@ -432,23 +403,26 @@ def animate_plot(Xorder, Yorder, pause_time=1):
     # 画出所有点，初始为红色
     scat = ax.scatter(Xorder, Yorder, color='red')
 
-    # 设置图形的范围（可选，根据数据调整）
-    ax.set_xlim(min(Xorder) - 20, max(Xorder) + 20)
-    y_min = min(Yorder)
-    y_max = max(Yorder)
-    y_avarage = (min(Ycenter) + max(Ycenter)) / 2
-    # 选择 y_min 和 y_max 中离 y_avarage 较远的那个
-    if abs(y_min - y_avarage) > abs(y_max - y_avarage):
-        y_range = abs(y_min - y_avarage)
-    else:
-        y_range = abs(y_max - y_avarage)
-    scale_factor = 4  # 比例因子，可以根据需要调整
-    ax.set_ylim(y_avarage - y_range * scale_factor, y_avarage + y_range * scale_factor)
+    # 设置图形的范围
+    padding = 1
+    ax.set_xlim(min(Xorder) - padding, max(Xorder) + padding)
+    ax.set_ylim(min(Yorder) - padding, max(Yorder) + padding)
 
-    # 显示图形并刷新
-    plt.show()
-    plt.pause(0.1)  # 短暂暂停以确保图形窗口显示
+    # 初始化机器人的位置，开始于第一个点
+    robot_marker, = ax.plot([Xorder[0]], [Yorder[0]], marker='o', markersize=10, color='green')
 
+    # 初始化路径线条
+    path_line, = ax.plot([], [], color='blue')
+    path_x, path_y = [Xorder[0]], [Yorder[0]]
+
+    # 初始化颜色列表
+    colors = ['red'] * len(Xorder)
+    colors[0] = 'green'
+
+    scat.set_color(colors)
+
+    # Precompute all positions
+    positions = []
     # 定义长方形中心位置的列表
     rectangle_centers = []
     for i in range(len(Xcenter)):
@@ -474,23 +448,49 @@ def animate_plot(Xorder, Yorder, pause_time=1):
 
     # 遍历点并逐步连接
     for i in range(1, len(Xorder)):
-        # 将上一个点变为绿色
-        ax.scatter(Xorder[i - 1], Yorder[i - 1], color='green')
+        x_start, y_start = Xorder[i - 1], Yorder[i - 1]
+        x_end, y_end = Xorder[i], Yorder[i]
+        steps = steps_per_move[i - 1]
+        delta_x = (x_end - x_start) / steps
+        delta_y = (y_end - y_start) / steps
+        for step in range(steps):
+            current_x = x_start + delta_x * step
+            current_y = y_start + delta_y * step
+            positions.append((current_x, current_y))
+        # Ensure the final position is exact
+        positions.append((x_end, y_end))
+        colors[i] = 'green'  # Mark the point as visited
 
-        # 连接当前点和上一个点
-        ax.plot([Xorder[i - 1], Xorder[i]], [Yorder[i - 1], Yorder[i]], color='blue')
+    # Define the update function for FuncAnimation
+    def update(frame):
+        if frame >= len(positions):
+            return robot_marker, path_line
 
-        # 刷新图形以显示更改
-        plt.draw()
-        plt.pause(pause_time)  # 暂停指定时间
+        current_x, current_y = positions[frame]
+        robot_marker.set_data([current_x], [current_y])
 
-    # 将最后一个点变为绿色
-    ax.scatter(Xorder[-1], Yorder[-1], color='green')
+        # Update the path
+        path_x.append(current_x)
+        path_y.append(current_y)
+        path_line.set_data(path_x, path_y)
 
-    # 最终刷新并保持图形窗口打开
-    plt.draw()
-    plt.pause(0.1)  # 短暂暂停以确保最后一个点变色
-    plt.ioff()  # 关闭交互模式
+        # Update colors if at the end of a move
+        # Determine which point is reached
+        move_index = 0
+        cumulative_steps = 0
+        for i, steps in enumerate(steps_per_move):
+            if frame < cumulative_steps + steps:
+                break
+            cumulative_steps += steps
+            move_index += 1
+            if move_index < len(colors):
+                colors[move_index] = 'green'
+                scat.set_color(colors)
+
+        return robot_marker, path_line
+
+    ani = animation.FuncAnimation(fig, update, frames=len(positions), interval=interval, blit=True, repeat=False)
+
     plt.show()
 
 if __name__ == "__main__" :
