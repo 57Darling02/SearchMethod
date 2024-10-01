@@ -1,9 +1,12 @@
 import random, math
+import time
 from copy import deepcopy
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import matplotlib
 import matplotlib.patches as patches
+import numpy as np
+
 matplotlib.use('TkAgg')  # 或其他适合的后端
 from tqdm import *  # 进度条
 DEBUG = True
@@ -27,7 +30,7 @@ X.insert(0,Center_pos[0])
 Y.insert(0,Center_pos[1])
 
 check_spot = {i: (X[i], Y[i]) for i in range(len(X))}
-#print_DEBUG(f"check_spot:{check_spot}")
+print_DEBUG(f"check_spot:{check_spot}")
 # 进入a条铁路有b个车厢，停留时间为c-d分钟
 # (a,b,c,d)
 train1 = (0,9,0,60)
@@ -46,15 +49,15 @@ for train in alltrains:
 #print_DEBUG(f'checktask:{check_task_dist}') # check_task_dist[num from 0] = [(c,d),check_spot_number]
 
 geneNum = 100
-generationNum = 30  # 迭代次数
+generationNum = 300  # 迭代次数
 CENTER = 0  # 配送中心
-HUGE = 99999
+HUGE = 100000000  # 无穷大
 VARY = 0.05  # 变异几率
 n = len(check_task_dist)-1  # 检查任务数量 减去第0起点任务
 k = 5  # 车辆数量
 epu = 20  # 早到惩罚成本
 lpu = HUGE  # 晚到惩罚成本
-speed = 40  # 速度，km/h
+speed = 80  # 速度，km/h
 costPerKilo = 1  # 油价
 Q = 0
 m = 0  # 换电站数量
@@ -138,41 +141,41 @@ class Gene:
             elif pos == CENTER:
                 timeSpent = 0
             # update time spent on road
-            timeSpent += (dist[i - 1] / speed)
+            timeSpent += (dist[i - 1] / (speed/3.6))
             # arrive early
             if timeSpent < check_task_dist[pos][0][0]:
                 timeCost += ((check_task_dist[pos][0][0] - timeSpent) * epu)
                 timeSpent = check_task_dist[pos][0][0]
             # arrive late
             elif timeSpent > check_task_dist[pos][0][1]:
-                timeCost += ((timeSpent - check_task_dist[pos][0][1]) * lpu)
+                # timeCost += ((timeSpent - check_task_dist[pos][0][1]) * lpu)
+                timeCost += HUGE
             # update time
             timeSpent += t
 
         # overload cost and out of fuel cost
-        load = 0
-        distAfterCharge = 0
-        for i, pos in enumerate(self.data):
-            # skip first center
-            if i == 0:
-                continue
-            # charge here
-            if pos >= n:
-                distAfterCharge = 0
-            # at center, re-load
-            elif pos == CENTER:
-                load = 0
-                distAfterCharge = 0
-            # normal
-            else:
-                load += t
-                distAfterCharge += dist[i - 1]
-                # update load and out of fuel cost
-                overloadCost += (HUGE * (load > Q))
-                fuelCost += (HUGE * (distAfterCharge > dis))
+        # load = 0
+        # distAfterCharge = 0
+        # for i, pos in enumerate(self.data):
+        #     # skip first center
+        #     if i == 0:
+        #         continue
+        #     # charge here
+        #     if pos >= n:
+        #         distAfterCharge = 0
+        #     # at center, re-load
+        #     elif pos == CENTER:
+        #         load = 0
+        #         distAfterCharge = 0
+        #     # normal
+        #     else:
+        #         load += t
+        #         distAfterCharge += dist[i - 1]
+        #         # update load and out of fuel cost
+        #         overloadCost += (HUGE * (load > Q))
+        #         fuelCost += (HUGE * (distAfterCharge > dis))
 
         fit = distCost + timeCost + overloadCost + fuelCost
-        # print(f"fit:{fit}")
         return 1/fit
 
     def updateChooseProb(self, sumFit):
@@ -385,7 +388,7 @@ def vary(genes):
     return genes
 
 
-def animate_plot_funcanimation(Xorder, Yorder, base_steps_per_unit=10, interval=10):
+def animate_plot_funcanimation(Xorder, Yorder, interval=10):
     """
     使用 FuncAnimation 实现机器人移动的动画仿真。
 
@@ -395,6 +398,9 @@ def animate_plot_funcanimation(Xorder, Yorder, base_steps_per_unit=10, interval=
     - base_steps_per_unit: 每单位距离的基础步数，用于控制移动速度
     - interval: 每帧之间的时间间隔（毫秒）
     """
+
+
+
     # 计算每段的距离和对应的步数
     distances = [math.hypot(Xorder[i] - Xorder[i-1], Yorder[i] - Yorder[i-1]) for i in range(1, len(Xorder))]
     steps_per_move = [max(int(distance/(speed*3.6) *1000/interval ), 1) for distance in distances]
@@ -415,12 +421,9 @@ def animate_plot_funcanimation(Xorder, Yorder, base_steps_per_unit=10, interval=
         y_range = abs(y_min - y_avarage)
     else:
         y_range = abs(y_max - y_avarage)
-    scale_factor = 4  # 比例因子，可以根据需要调整
+    scale_factor = 2  # 比例因子，可以根据需要调整
     ax.set_ylim(y_avarage - y_range * scale_factor, y_avarage + y_range * scale_factor)
 
-    # padding = 1
-    # ax.set_xlim(min(Xorder) - padding, max(Xorder) + padding)
-    # ax.set_ylim(min(Yorder) - padding, max(Yorder) + padding)
 
     # 初始化机器人的位置，开始于第一个点
     robot_marker, = ax.plot([Xorder[0]], [Yorder[0]], marker='o', markersize=10, color='green')
@@ -464,16 +467,33 @@ def animate_plot_funcanimation(Xorder, Yorder, base_steps_per_unit=10, interval=
     for i in range(1, len(Xorder)):
         x_start, y_start = Xorder[i - 1], Yorder[i - 1]
         x_end, y_end = Xorder[i], Yorder[i]
-        steps = steps_per_move[i - 1]
-        delta_x = (x_end - x_start) / steps
-        delta_y = (y_end - y_start) / steps
-        for step in range(steps):
+
+        # 计算x和y方向的步数
+        x_step = int(abs(x_end - x_start) / (speed) * 1000 / interval)
+        y_step = int(abs(y_end - y_start) / (speed) * 1000 / interval)
+
+        # 初始化增量
+        delta_x = delta_y = 0
+        if x_step != 0:
+            delta_x = (x_end - x_start) / x_step
+        if y_step != 0:
+            delta_y = (y_end - y_start) / y_step
+
+        current_x, current_y = x_start, y_start
+
+        # 添加x方向的中间位置
+        for step in range(x_step):
             current_x = x_start + delta_x * step
+            positions.append((current_x, current_y))
+
+        # 添加y方向的中间位置
+        for step in range(y_step):
             current_y = y_start + delta_y * step
             positions.append((current_x, current_y))
-        # Ensure the final position is exact
+
+        # 确保最终位置是精确的
         positions.append((x_end, y_end))
-        colors[i] = 'green'  # Mark the point as visited
+        colors[i] = 'green'  # 标记点为已访问
 
     # Define the update function for FuncAnimation
     def update(frame):
