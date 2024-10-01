@@ -75,7 +75,8 @@ class Gene:
         self.chooseProb = 0  # 选择概率
 
     # randomly choose a gene
-    def _generate(self, length):
+    @staticmethod
+    def _generate(length):
         data = [i for i in range(1, length)]
         random.shuffle(data)
         data.insert(0, CENTER)
@@ -84,7 +85,8 @@ class Gene:
 
     # insert zeors at proper positions
     # use average task num to insert zeros ensure gene will be divided into k robots
-    def _insertZeros(self, data):
+    @staticmethod
+    def _insertZeros(data):
         sum = 0
         newData = []
         average_task_num = int(check_request_index/k)+1
@@ -404,9 +406,21 @@ def animate_plot_funcanimation(Xorder, Yorder, base_steps_per_unit=10, interval=
     scat = ax.scatter(Xorder, Yorder, color='red')
 
     # 设置图形的范围
-    padding = 1
-    ax.set_xlim(min(Xorder) - padding, max(Xorder) + padding)
-    ax.set_ylim(min(Yorder) - padding, max(Yorder) + padding)
+    ax.set_xlim(min(Xorder) - 20, max(Xorder) + 20)
+    y_min = min(Yorder)
+    y_max = max(Yorder)
+    y_avarage = (min(Ycenter) + max(Ycenter)) / 2
+    # 选择 y_min 和 y_max 中离 y_avarage 较远的那个
+    if abs(y_min - y_avarage) > abs(y_max - y_avarage):
+        y_range = abs(y_min - y_avarage)
+    else:
+        y_range = abs(y_max - y_avarage)
+    scale_factor = 4  # 比例因子，可以根据需要调整
+    ax.set_ylim(y_avarage - y_range * scale_factor, y_avarage + y_range * scale_factor)
+
+    # padding = 1
+    # ax.set_xlim(min(Xorder) - padding, max(Xorder) + padding)
+    # ax.set_ylim(min(Yorder) - padding, max(Yorder) + padding)
 
     # 初始化机器人的位置，开始于第一个点
     robot_marker, = ax.plot([Xorder[0]], [Yorder[0]], marker='o', markersize=10, color='green')
