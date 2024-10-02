@@ -1,5 +1,4 @@
 import random, math
-import time
 from copy import deepcopy
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
@@ -7,7 +6,7 @@ import matplotlib
 import matplotlib.patches as patches
 import numpy as np
 
-matplotlib.use('TkAgg')  # 或其他适合的后端
+matplotlib.use('TkAgg')
 from tqdm import *  # 进度条
 DEBUG = True
 
@@ -15,6 +14,8 @@ def print_DEBUG(msg):
     if DEBUG:
         print(msg)
 
+interval = 0.1 # 每一步仿真的时间
+beilv = 10 # 仿真加速倍率
 railway_gap = 5
 train_box_length = 16
 railway_num = 3
@@ -40,13 +41,14 @@ alltrains = [train1, train2, train3]
 check_request_index = 1
 # check_task_dist[0] is the no limited check_task, it need to use when generate gene
 check_task_dist = {0:[(0,10000),0]}
+
 for train in alltrains:
     a,b,c,d = train
     for i in range(1,b):
         check_task_dist[check_request_index]=[(c,d),(a*(max_train_box_num-1))+i]
         check_task_dist[check_request_index+1]=[(c,d),((a+1)*(max_train_box_num-1))+i]
         check_request_index += 2
-#print_DEBUG(f'checktask:{check_task_dist}') # check_task_dist[num from 0] = [(c,d),check_spot_number]
+print_DEBUG(f'checktask:{check_task_dist}') # check_task_dist[num from 0] = [(c,d),check_spot_number]
 
 geneNum = 100
 generationNum = 300  # 迭代次数
@@ -57,11 +59,11 @@ n = len(check_task_dist)-1  # 检查任务数量 减去第0起点任务
 k = 5  # 车辆数量
 epu = 20  # 早到惩罚成本
 lpu = HUGE  # 晚到惩罚成本
-speed = 80  # 速度，km/h
+speed = 40  # 速度，km/h
 costPerKilo = 1  # 油价
 Q = 0
 m = 0  # 换电站数量
-t = 5
+t = 0.5
 dis = 0
 
 class Gene:
@@ -110,7 +112,7 @@ class Gene:
 
     # return fitness
     def getFit(self):
-        fit = distCost = timeCost = overloadCost = fuelCost = 0
+        fit = timespentCost = timeCost = max_time_spent = 0
         dist = []  # from this to next
 
         # calculate distance
@@ -139,6 +141,8 @@ class Gene:
                 continue
             # new car
             elif pos == CENTER:
+                if timeSpent > max_time_spent:
+                    max_time_spent = timeSpent
                 timeSpent = 0
             # update time spent on road
             timeSpent += (dist[i - 1] / (speed/3.6))
@@ -153,29 +157,8 @@ class Gene:
             # update time
             timeSpent += t
 
-        # overload cost and out of fuel cost
-        # load = 0
-        # distAfterCharge = 0
-        # for i, pos in enumerate(self.data):
-        #     # skip first center
-        #     if i == 0:
-        #         continue
-        #     # charge here
-        #     if pos >= n:
-        #         distAfterCharge = 0
-        #     # at center, re-load
-        #     elif pos == CENTER:
-        #         load = 0
-        #         distAfterCharge = 0
-        #     # normal
-        #     else:
-        #         load += t
-        #         distAfterCharge += dist[i - 1]
-        #         # update load and out of fuel cost
-        #         overloadCost += (HUGE * (load > Q))
-        #         fuelCost += (HUGE * (distAfterCharge > dis))
-
-        fit = distCost + timeCost + overloadCost + fuelCost
+        timespentCost = max_time_spent * 1000
+        fit = timespentCost + timeCost + distCost
         return 1/fit
 
     def updateChooseProb(self, sumFit):
@@ -391,6 +374,7 @@ def vary(genes):
 def animate_plot_funcanimation(Xorder, Yorder, interval=10):
     """
     使用 FuncAnimation 实现机器人移动的动画仿真。
+    将废弃此段，重新设计仿真
 
     参数：
     - Xorder: 点的X坐标列表
@@ -435,23 +419,22 @@ def animate_plot_funcanimation(Xorder, Yorder, interval=10):
     # 初始化颜色列表
     colors = ['red'] * len(Xorder)
     colors[0] = 'green'
-
     scat.set_color(colors)
 
     # Precompute all positions
     positions = []
-    # 定义长方形中心位置的列表
+    # 定义车厢中心位置的列表
     rectangle_centers = []
     for i in range(len(Xcenter)):
         rectangle_centers.append((Xcenter[i], Ycenter[i]))
 
-    # 遍历中心位置并生成所有长方形
+    # 遍历中心位置并生成车厢
     for center_x, center_y in rectangle_centers:
         # 创建一个长为15宽为4的长方形表示火车车厢
         rect = patches.Rectangle((center_x - (train_box_length-3)/2, center_y - (railway_gap-1)/2), (train_box_length-3), (railway_gap-1), linewidth=1, edgecolor='brown', facecolor='brown')
         ax.add_patch(rect)
 
-    # 用另一种颜色的线将中心纵坐标相等的相邻矩形连接
+    # 用另一种颜色的线将两个相邻车厢连接
     for i in range(len(rectangle_centers) - 1):
         if rectangle_centers[i][1] == rectangle_centers[i + 1][1]:
             center_y = rectangle_centers[i][1]
@@ -463,7 +446,7 @@ def animate_plot_funcanimation(Xorder, Yorder, interval=10):
     plt.draw()
     plt.pause(0.1)  # 短暂暂停以确保长方形显示
 
-    # 遍历点并逐步连接
+    # 遍历点并逐步连接，这里是计算机器人的移动路径
     for i in range(1, len(Xorder)):
         x_start, y_start = Xorder[i - 1], Yorder[i - 1]
         x_end, y_end = Xorder[i], Yorder[i]
@@ -527,14 +510,124 @@ def animate_plot_funcanimation(Xorder, Yorder, interval=10):
 
     plt.show()
 
+class robot:
+    def __init__(self,data,color = 'gray' ):
+        self.timestamp = 0
+        self.color = color
+        self.data = data
+        self.check = False
+        # load the destination
+        self.destinations = []
+        self.start_time_list = []
+        for i in data:
+            self.destinations.append(np.array(check_spot[check_task_dist[i][1]], dtype=np.float64))
+            self.start_time_list.append(check_task_dist[i][0])
+        # initialize robot position at the first destination (0)
+        self.position = np.array(self.destinations.pop(0), dtype=np.float64)  # 车辆的位置
+        self.velocity = np.array((0, 0), dtype=np.float64)  # 车辆的速度
+    def find_neighbors(self, all_vehicles, communication_range):
+        """
+        查找在通信范围内的邻居车辆
+        """
+        neighbors = []
+        for vehicle in all_vehicles:
+            if vehicle != self:
+                distance = np.linalg.norm(self.position - vehicle.position)
+                if distance <= communication_range:
+                    neighbors.append(vehicle)
+        return neighbors
+    def update_state(self, neighbors , alpha=0.05):
+        if not self.destinations: # 完成任务后不再更新状态
+            return
+        delta_v = np.array((0.0, 0.0))# initialize delta_v
+        if not np.array_equal(self.position, self.destinations[0]):
+            delta_v =  self.destinations[0] - self.position
+        else:
+            if self.check == False:
+                self.check = True
+                self.temp_timestamp = self.timestamp
+                self.color = 'blue'
+                return
+            else:
+                if self.timestamp - self.temp_timestamp >= t * 60 * interval :
+                    self.color = 'gray'
+                    self.check = False
+                    self.destinations.pop(0)
+                else:
+                    delta_v = self.position
+                    self.timestamp += interval
+                    return
+        # 机器人势场防撞机制
+        # repulsion_force = np.array((0.0, 0.0))
+        # if neighbors:
+        #     for neighbor in neighbors:
+        #         repulsion_force -= alpha * (self.position - neighbor.position) /max(1, (np.linalg.norm(self.position - neighbor.position))**2)
+        if delta_v[0] != 0 and self.position[1] in Y:
+            self.position[0] += delta_v[0] if abs(delta_v[0])<speed / 3.6 * interval else delta_v[0]/abs(delta_v[0]) * speed / 3.6 * interval
+        else:
+            self.position[1] += delta_v[1] if abs(delta_v[1])<speed / 3.6 * interval else delta_v[1]/abs(delta_v[1]) * speed / 3.6 * interval
+        self.timestamp += interval
+
+def run_simulation(robots, communication_range = 0, steps=1000):
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    for step in range(steps):
+        ax.clear()  # 清除上一步的绘图
+        Xorder ,Yorder = [], []
+        for i in check_spot:
+            Xorder.append(check_spot[i][0])
+            Yorder.append(check_spot[i][1])
+        # 画出所有点，初始为红色
+        scat = ax.scatter(Xorder, Yorder, color='red')
+        # 设置图形的范围
+        ax.set_xlim(min(Xorder) - 20, max(Xorder) + 20)
+        y_min = min(Yorder)
+        y_max = max(Yorder)
+        y_avarage = (min(Ycenter) + max(Ycenter)) / 2
+        # 选择 y_min 和 y_max 中离 y_avarage 较远的那个
+        if abs(y_min - y_avarage) > abs(y_max - y_avarage):
+            y_range = abs(y_min - y_avarage)
+        else:
+            y_range = abs(y_max - y_avarage)
+        scale_factor = 2  # 比例因子，可以根据需要调整
+        ax.set_ylim(y_avarage - y_range * scale_factor, y_avarage + y_range * scale_factor)
+
+        for robot in robots:
+            robot.update_state(None)
+
+
+        for i, robot in enumerate(robots):
+            ax.plot(robot.position[0], robot.position[1], marker='o', color=robot.color, markersize=6)
+        plt.pause(interval/beilv)
+
+    plt.show()
+
+
+def generate_robots():
+    global robots, i
+    robots = []
+    datas = [0]
+    i = 1
+    zerocounter = 1
+    while i < len(genes[0].data):
+        datas.append(genes[0].data[i])
+        if genes[0].data[i] == CENTER:
+            zerocounter += 1
+            if zerocounter == 2:
+                robot1 = robot(datas)
+                robots.append(robot1)
+                datas = [0]
+                zerocounter = 1
+                print(f'robot1:{robot1.data}')
+        i += 1
+    return robots
+
+
+
 if __name__ == "__main__" :
     genes = getRandomGenes(geneNum) # 初始种群
     # 迭代
     for i in tqdm(range(generationNum)):
-        # print(i)
-        # print('\n')
-        # for gene in genes:
-        #     print(f"genes{gene.data}")
         updateChooseProb(genes)
         sumProb = getSumProb(genes)
         chosenGenes = choose(deepcopy(genes))   # 选择
@@ -547,5 +640,6 @@ if __name__ == "__main__" :
     print('\r\n')
     print('data:', genes[0].data)
     print('fit:', genes[0].fit)
-    genes[0].plot() # 画出来
+    robots = generate_robots()
+    run_simulation(robots)
 
