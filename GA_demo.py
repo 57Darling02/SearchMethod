@@ -112,9 +112,9 @@ class Gene:
 
     # return fitness
     def getFit(self):
-        fit = timespentCost = timeCost = max_time_spent = 0
+        fit = timeCost = max_time_spent = 0
         dist = []  # from this to next
-
+        timespentlist = []
         # calculate distance
         i = 1
         while i < len(self.data):
@@ -143,6 +143,7 @@ class Gene:
             elif pos == CENTER:
                 if timeSpent > max_time_spent:
                     max_time_spent = timeSpent
+                    timespentlist.append(timeSpent)
                 timeSpent = 0
             # update time spent on road
             timeSpent += (dist[i - 1] / (speed/3.6))
@@ -152,13 +153,13 @@ class Gene:
                 timeSpent = check_task_dist[pos][0][0]
             # arrive late
             elif timeSpent > check_task_dist[pos][0][1]:
-                # timeCost += ((timeSpent - check_task_dist[pos][0][1]) * lpu)
                 timeCost += HUGE
             # update time
             timeSpent += t
 
-        timespentCost = max_time_spent * 1000
-        fit = timespentCost + timeCost + distCost
+        maxtimespentCost = max_time_spent * 100
+
+        fit = maxtimespentCost + timeCost + distCost + (max(timespentlist)-min(timespentlist))*100 +(max(dist)-min(dist))*100
         return 1/fit
 
     def updateChooseProb(self, sumFit):
@@ -565,11 +566,17 @@ class robot:
         if delta_v[0] != 0 and self.position[1] in Y:
             self.position[0] += delta_v[0] if abs(delta_v[0])<speed / 3.6 * interval else delta_v[0]/abs(delta_v[0]) * speed / 3.6 * interval
         else:
-            self.position[1] += delta_v[1] if abs(delta_v[1])<speed / 3.6 * interval else delta_v[1]/abs(delta_v[1]) * speed / 3.6 * interval
+            self.position[1] += delta_v[1] if abs(delta_v[1])<speed/2 / 3.6 * interval else delta_v[1]/abs(delta_v[1]) * speed/2 / 3.6 * interval
         self.timestamp += interval
 
 def run_simulation(robots, communication_range = 0, steps=1000):
     fig, ax = plt.subplots(figsize=(10, 8))
+    # 定义车厢中心位置的列表
+    rectangle_centers = []
+    for i in range(len(Xcenter)):
+        rectangle_centers.append((Xcenter[i], Ycenter[i]))
+
+
 
     for step in range(steps):
         ax.clear()  # 清除上一步的绘图
@@ -591,6 +598,23 @@ def run_simulation(robots, communication_range = 0, steps=1000):
             y_range = abs(y_max - y_avarage)
         scale_factor = 2  # 比例因子，可以根据需要调整
         ax.set_ylim(y_avarage - y_range * scale_factor, y_avarage + y_range * scale_factor)
+        # 遍历中心位置并生成车厢
+        for center_x, center_y in rectangle_centers:
+            # 创建一个长为15宽为4的长方形表示火车车厢
+            rect = patches.Rectangle((center_x - (train_box_length - 3) / 2, center_y - (railway_gap - 1) / 2),
+                                     (train_box_length - 3), (railway_gap - 1), linewidth=1, edgecolor='brown',
+                                     facecolor='brown')
+            ax.add_patch(rect)
+
+        # 用另一种颜色的线将两个相邻车厢连接
+        for i in range(len(rectangle_centers) - 1):
+            if rectangle_centers[i][1] == rectangle_centers[i + 1][1]:
+                center_y = rectangle_centers[i][1]
+                center_x1 = rectangle_centers[i][0] + (train_box_length - 3) / 2  # 左边长方形右边那条边的中间
+                center_x2 = rectangle_centers[i + 1][0] - (train_box_length - 3) / 2  # 右边长方形左边那条边的中间
+                ax.plot([center_x1, center_x2], [center_y, center_y], color='brown', linestyle='-', linewidth=2)
+
+
 
         for robot in robots:
             robot.update_state(None)
