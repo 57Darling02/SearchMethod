@@ -36,7 +36,7 @@ print_DEBUG(f"check_spot:{check_spot}")
 # (a,b,c,d)
 train1 = (0,9,0,60)
 train2 = (1,5,0,60)
-train3 = (2,8,70,130)
+train3 = (0,8,70,130)
 alltrains = [train1, train2, train3]
 check_request_index = 1
 # check_task_dist[0] is the no limited check_task, it need to use when generate gene
