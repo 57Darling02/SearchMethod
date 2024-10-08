@@ -21,6 +21,7 @@ def BFS(graph, start, end):
         # add the node to the path
         path.append(node)
         # if the node is the end node
+        # search current node
         if node == end:
             return path
         # get the neighbors of the node
@@ -107,19 +108,19 @@ def DFS_in_recursion(graph, start, end, method_type):
 
 
 def UniformCostSearch(graph, start, end):
+    Dijkstra(graph,start, end)
 
-    pass
 
 # we can use Dijkstra to find the path
 def Dijkstra(ori_graph, start, end):
-    search_path = []
+    search_path = [] # search_path use to record the order which the node is real visited
     n = len(ori_graph)
     dist=np.full(n, np.inf)
     # record the previous node
     pred=np.full(n,-1)
     visitd = []
     dist[start]=0
-    for i in range(n-1):
+    for i in range(n):
         min = np.inf
         min_index = -1
         for j in range(n):
@@ -136,7 +137,7 @@ def Dijkstra(ori_graph, start, end):
             print('Dijkstra find the end node')
             break
     current = end
-    path =[]
+    path =[end] # real path form start to end
     while(current!=start):
         current = pred[current]
         path.insert(0,current)
@@ -151,14 +152,15 @@ print(f"BFS search_path:{path} \nlen:{len(path)}")
 
 path = DFS_in_loop(originGraph, 0, 36)
 print(f"DFS_in_loop search_path:{path} \nlen:{len(path)}")
-a = len(set(path))
+
 path = DFS_in_recursion(originGraph, 0, 36, 0)
 print(f"DFS_in_recursion0 search_path:{path} \nlen:{len(path)}")
 
 path = DFS_in_recursion(originGraph, 0, 36, 1)
 print(f"DFS_in_recursion1 search_path:{path} \nlen:{len(path)}")
-#
+
 path ,search_path = Dijkstra(originGraph, 0, 36)
 print(f'Dijkstra_Path:{path}\nsearch_path:{search_path}\nlen:{len(search_path)}')
 
-
+a = len(set(search_path))
+print()
