@@ -174,7 +174,7 @@ class Gene:
 def getSumFit(genes):
     sum = 0
     for gene in genes:
-        sum += gene.cost
+        sum += gene.fit
     return sum
 
 
@@ -190,7 +190,7 @@ def getRandomGenes(size):
 def getSumFit(genes):
     sumFit = 0
     for gene in genes:
-        sumFit += gene.cost
+        sumFit += gene.fit
     return sumFit
 
 
@@ -255,7 +255,7 @@ def crossPair(gene1, gene2, crossedGenes):
     newGene1.append(CENTER)
     newGene2.append(CENTER)
     # 计算适应度最高的
-    key = lambda gene: gene.cost
+    key = lambda gene: gene.fit
     possible = []
     print(f"newgene1{newGene1}")
     print(f"firstpos1{firstPos1}")
@@ -268,7 +268,7 @@ def crossPair(gene1, gene2, crossedGenes):
     possible.sort(reverse=True, key=key)
     assert(possible)
     crossedGenes.append(possible[0])
-    key = lambda gene: gene.cost
+    key = lambda gene: gene.fit
     possible = []
     while gene2.data[firstPos2] != CENTER:
         newGene = newGene2.copy()
@@ -310,7 +310,7 @@ def varyOne(gene):
         newGene = gene.data.copy()
         newGene[p1], newGene[p2] = newGene[p2], newGene[p1] # 交换
         variedGenes.append(Gene(data=newGene.copy()))
-    key = lambda gene: gene.cost
+    key = lambda gene: gene.fit
     variedGenes.sort(reverse=True, key=key)
     return variedGenes[0]
 
@@ -337,7 +337,7 @@ if __name__ == "__main__" and not DEBUG:
         genes = mergeGenes(genes, crossedGenes) # 复制交叉至子代种群
         genes = vary(genes) # under construction
     # sort genes with respect to chooseProb
-    key = lambda gene: gene.cost
+    key = lambda gene: gene.fit
     genes.sort(reverse=True, key=key)   # 以fit对种群排序
     print('\r\n')
     print('data:', genes[0].data)
